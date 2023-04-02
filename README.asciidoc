@@ -2,6 +2,11 @@
 
 This application demonstrates a bug in TreeView’s `selectionModel` involving multiple selections.
 
+I noticed this bug while I was working on my JavaFX applications, and tried to isolate it into this application.
+
+If there is something wrong with the way I use TreeView or the labels’ bindings, please let me know.
+Similarly, if you have alternative workarounds or can improve those that I present here, I’d be happy to see them!
+
 '''
 
 The layout of the application is this:
@@ -26,8 +31,8 @@ image:images/Screenshot 2023-04-02 111855.png[]image:images/Screenshot 2023-04-0
 
 As expected, since nothing is selected, `selectedItem` is `null` and `selectedItems` (plural) is empty.
 
-However, if the selection includes multiple items, de-selecting either the first or last item leads to something different from what the user sees.
-Compare the initial selection (left) with the state after I de-selected the 3rd item (right):
+However, if the selection includes multiple items, de-selecting an item leads to something different from what the user sees.
+Compare the initial selection (left) with the state after I de-selected the 3rd item:
 
 image:images/Screenshot 2023-04-02 103923.png[]image:images/Screenshot 2023-04-02 103935.png[]
 
@@ -40,6 +45,27 @@ I couldn’t try any JavaFX earlier than version 11, and it seems this bug is st
 
 === Workaround
 
+Commit in branch `workaround`: 098014da82bc927800670aaa3dfcb8b8ee033d36
+
+[source,kotlin]
+----
+tree.selectionModel.selectedItems.addListener(ListChangeListener {
+    while (it.next()) {
+        if (tree.selectionModel.selectedItem in it.removed) {
+            if (it.from == 0) {
+                tree.selectionModel.select(it.list.firstOrNull())
+            } else {
+                tree.selectionModel.select(it.list.lastOrNull())
+            }
+        }
+    }
+})
+----
+
+The workaround simply listens to changes of `selectedItems` (plural) which has a `removed` list.
+If it turns out that the (buggy) `selectedItem` is inside `removed`, it tells the TreeView to select something else.
+One needs to tell apart whether the de-selection was at the beginning or the end of the selection which is what the inner `if` condition does.
+
 == Bug #2: Removing elements from the beginning or end
 
 First the correct behavior: I select 3 items (left) from the top to the bottom so that the 3rd item is the `selectedItem`.
@@ -50,7 +76,7 @@ image:images/Screenshot 2023-04-02 103923.png[]image:images/Screenshot 2023-04-0
 As expected, `selectedItem` jumps to the 2nd item (which has become the final item of the selection), and `selectedItems` (plural) only contains two items.
 
 However, when the selection includes the last item of the list, removing it leads to a contradictory state again.
-First, I selected the last items from top to bottom (i.e. the 7th item is the `selectedItem`).
+On the left, I selected the last items from top to bottom (i.e. the 7th item is the `selectedItem`).
 Then I let the 7th item be removed:
 
 image:images/Screenshot 2023-04-02 103955.png[]image:images/Screenshot 2023-04-02 104002.png[]
@@ -71,3 +97,18 @@ While I didn’t try any earlier JavaFX version than 11, the bug seems to have d
 * Beginning with JavaFX 19, the bug also occurs with the final item.
 
 === Workaround
+
+Commit in `workaround` branch: d46881e2a667893c746788739f4ff7166365029d
+
+[source,kotlin]
+----
+tree.focusModel.focusedItemProperty().addListener { _, _, new ->
+    if (tree.selectionModel.selectedItem?.parent == null) {
+        tree.selectionModel.select(new)
+    }
+}
+----
+
+Luckily, when removing the final/first item of a selection, `focusedItem` changes accordingly.
+So one can listen to changes there and ask whether the (buggy) `selectedItem` is still there (whether it has a `parent`).
+If not, tell the TreeView to select the newly-focused item.
