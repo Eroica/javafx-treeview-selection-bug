@@ -1,6 +1,7 @@
 package earth.groundctrl.javafxtreeviewselectionbug
 
 import javafx.beans.binding.Bindings
+import javafx.collections.ListChangeListener
 import javafx.fxml.FXML
 import javafx.scene.control.Label
 import javafx.scene.control.SelectionMode
@@ -33,6 +34,18 @@ class HelloController {
                 tree.selectionModel.selectedIndexProperty(), tree.selectionModel.selectedIndices, tree.focusModel.focusedItemProperty()
             )
         )
+
+        tree.selectionModel.selectedItems.addListener(ListChangeListener {
+            while (it.next()) {
+                if (tree.selectionModel.selectedItem in it.removed) {
+                    if (it.from == 0) {
+                        tree.selectionModel.select(it.list.firstOrNull())
+                    } else {
+                        tree.selectionModel.select(it.list.lastOrNull())
+                    }
+                }
+            }
+        })
     }
 
     @FXML
