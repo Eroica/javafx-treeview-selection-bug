@@ -46,6 +46,12 @@ class HelloController {
                 }
             }
         })
+
+        tree.focusModel.focusedItemProperty().addListener { _, _, new ->
+            if (tree.selectionModel.selectedItem?.parent == null) {
+                tree.selectionModel.select(new)
+            }
+        }
     }
 
     @FXML
