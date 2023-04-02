@@ -1,0 +1,73 @@
+= JavaFX TreeView selection bug
+
+This application demonstrates a bug in TreeView’s `selectionModel` involving multiple selections.
+
+'''
+
+The layout of the application is this:
+
+image::images/Screenshot 2023-04-02 103923.png[]
+
+A TreeView in the center contains a list of String items.
+The labels on the bottom are bound to display the current state of the TreeView’s `selectionModel`.
+The button on the top is set to remove the selected item (if there is any).
+
+It is important to note that items can be focused, but unselected.
+This is why the labels at the bottom also include `focusedItem`, and which will become useful to work around the following bugs.
+
+(I’m using _left_ and _right_ here along with AsciiDoc’s inline images so that the screenshots are put on a single line. Depending on your screen size, the images might appear below each other.)
+
+== Bug #1: De-selecting with Ctrl-click
+
+The first bug occurs when shrinking the selection by Ctrl-clicking on an item.
+Here is what happens when I select a single item (left) and then de-select it:
+
+image:images/Screenshot 2023-04-02 111855.png[]image:images/Screenshot 2023-04-02 111901.png[]]
+
+As expected, since nothing is selected, `selectedItem` is `null` and `selectedItems` (plural) is empty.
+
+However, if the selection includes multiple items, de-selecting either the first or last item leads to something different from what the user sees.
+Compare the initial selection (left) with the state after I de-selected the 3rd item (right):
+
+image:images/Screenshot 2023-04-02 103923.png[]image:images/Screenshot 2023-04-02 103935.png[]
+
+`selectedItem` and `selectedItems` (plural) seem to contradict each other:
+`selectedItems` (plural) only show 1 and 2 selected (which is also what the user sees), but `selectedItem` is still set to the 3rd item.
+
+=== Bisection
+
+I couldn’t try any JavaFX earlier than version 11, and it seems this bug is still present there.
+
+=== Workaround
+
+== Bug #2: Removing elements from the beginning or end
+
+First the correct behavior: I select 3 items (left) from the top to the bottom so that the 3rd item is the `selectedItem`.
+Then I click on the button to remove it (right):
+
+image:images/Screenshot 2023-04-02 103923.png[]image:images/Screenshot 2023-04-02 103945.png[]
+
+As expected, `selectedItem` jumps to the 2nd item (which has become the final item of the selection), and `selectedItems` (plural) only contains two items.
+
+However, when the selection includes the last item of the list, removing it leads to a contradictory state again.
+First, I selected the last items from top to bottom (i.e. the 7th item is the `selectedItem`).
+Then I let the 7th item be removed:
+
+image:images/Screenshot 2023-04-02 103955.png[]image:images/Screenshot 2023-04-02 104002.png[]
+
+While `selectedItems` (plural) correctly shows that 7 does not exist anymore, `selectedItem` is still incorrectly set to 7.
+`focusedItem` behaves correctly and sets the focus to the new final item.
+
+This bug happens in a similar way if the selection includes the very first item, i.e. selecting from the bottom to top (left) and then removing the first item (right):
+
+image:images/Screenshot 2023-04-02 104033.png[]image:images/Screenshot 2023-04-02 104041.png[]
+
+=== Bisection
+
+While I didn’t try any earlier JavaFX version than 11, the bug seems to have different stages:
+
+* In JavaFX 11 to 18, including the final item and then removing it correctly updates `selectedItem`.
+**  However, including the first item (bottom to top) and removing it showcases the bug.
+* Beginning with JavaFX 19, the bug also occurs with the final item.
+
+=== Workaround
